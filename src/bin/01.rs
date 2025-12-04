@@ -1,81 +1,74 @@
 advent_of_code::solution!(1);
 
-pub fn part_one(input: &str) -> Option<u64> {
-    let mut position: i32 = 50;
-    let mut count = 0u64;
-
-    for line in input.lines() {
-        let line = line.trim();
-        if line.is_empty() {
-            continue;
-        }
-
-        let direction = &line[0..1];
-        let distance: i32 = line[1..].parse().ok()?;
-
-        match direction {
-            "L" => position = (position - distance).rem_euclid(100),
-            "R" => position = (position + distance).rem_euclid(100),
-            _ => return None,
-        }
-
-        if position == 0 {
-            count += 1;
-        }
+/// Parse a rotation instruction like "L68" or "R14" into (direction, distance)
+fn parse_rotation(line: &str) -> Option<(char, i32)> {
+    let line = line.trim();
+    if line.is_empty() {
+        return None;
     }
+    let direction = line.chars().next()?;
+    let distance: i32 = line[1..].parse().ok()?;
+    Some((direction, distance))
+}
+
+/// Apply a rotation and return the new position
+fn apply_rotation(position: i32, direction: char, distance: i32) -> i32 {
+    match direction {
+        'L' => (position - distance).rem_euclid(100),
+        'R' => (position + distance).rem_euclid(100),
+        _ => position,
+    }
+}
+
+/// Count how many times we pass through 0 during a rotation
+fn count_zeros(position: i32, direction: char, distance: i32) -> i32 {
+    match direction {
+        'L' => {
+            if position == 0 {
+                distance / 100
+            } else if distance >= position {
+                (distance - position) / 100 + 1
+            } else {
+                0
+            }
+        }
+        'R' => {
+            if position == 0 {
+                distance / 100
+            } else if distance >= 100 - position {
+                (distance + position - 100) / 100 + 1
+            } else {
+                0
+            }
+        }
+        _ => 0,
+    }
+}
+
+pub fn part_one(input: &str) -> Option<u64> {
+    let count = input
+        .lines()
+        .filter_map(parse_rotation)
+        .fold((50i32, 0u64), |(pos, count), (dir, dist)| {
+            let new_pos = apply_rotation(pos, dir, dist);
+            let new_count = count + if new_pos == 0 { 1 } else { 0 };
+            (new_pos, new_count)
+        })
+        .1;
 
     Some(count)
 }
 
 pub fn part_two(input: &str) -> Option<u64> {
-    let mut position: i32 = 50;
-    let mut count = 0u64;
-
-    for line in input.lines() {
-        let line = line.trim();
-        if line.is_empty() {
-            continue;
-        }
-
-        let direction = &line[0..1];
-        let distance: i32 = line[1..].parse().ok()?;
-
-        // Count how many times we pass through 0 during this rotation
-        let zeros = match direction {
-            "L" => {
-                // Moving left: we hit 0 at clicks p, p+100, p+200, ... (if p > 0)
-                // or at clicks 100, 200, 300, ... (if p = 0)
-                if position == 0 {
-                    distance / 100
-                } else if distance >= position {
-                    (distance - position) / 100 + 1
-                } else {
-                    0
-                }
-            }
-            "R" => {
-                // Moving right: we hit 0 at click (100-p), then (100-p)+100, etc.
-                // or at clicks 100, 200, 300, ... (if p = 0)
-                if position == 0 {
-                    distance / 100
-                } else if distance >= 100 - position {
-                    (distance + position - 100) / 100 + 1
-                } else {
-                    0
-                }
-            }
-            _ => return None,
-        };
-
-        count += zeros as u64;
-
-        // Update position
-        match direction {
-            "L" => position = (position - distance).rem_euclid(100),
-            "R" => position = (position + distance).rem_euclid(100),
-            _ => {}
-        }
-    }
+    let count = input
+        .lines()
+        .filter_map(parse_rotation)
+        .fold((50i32, 0u64), |(pos, count), (dir, dist)| {
+            let zeros = count_zeros(pos, dir, dist) as u64;
+            let new_pos = apply_rotation(pos, dir, dist);
+            (new_pos, count + zeros)
+        })
+        .1;
 
     Some(count)
 }

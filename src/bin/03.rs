@@ -2,13 +2,20 @@ advent_of_code::solution!(3);
 
 /// Find the maximum 2-digit number by selecting exactly 2 batteries from a bank
 fn max_joltage_2(bank: &[u8]) -> u64 {
-    let mut max = 0u64;
+    let n = bank.len();
 
-    // For each position as the tens digit
-    for i in 0..bank.len() - 1 {
+    // Precompute suffix maximums: suffix_max[i] = max digit from position i to end
+    // This avoids O(n) scan for each position, making overall O(n) instead of O(n²)
+    let mut suffix_max = vec![0u8; n];
+    suffix_max[n - 1] = bank[n - 1];
+    for i in (0..n - 1).rev() {
+        suffix_max[i] = bank[i].max(suffix_max[i + 1]);
+    }
+
+    let mut max = 0u64;
+    for i in 0..n - 1 {
         let tens = bank[i] as u64;
-        // Find max digit after position i
-        let units = *bank[i + 1..].iter().max().unwrap() as u64;
+        let units = suffix_max[i + 1] as u64;  // O(1) lookup instead of O(n) scan
         let joltage = tens * 10 + units;
         max = max.max(joltage);
     }
@@ -43,7 +50,7 @@ fn max_joltage_k(bank: &[u8], k: usize) -> u64 {
     for remaining in (1..=k).rev() {
         // We can pick from [start, n - remaining] inclusive
         let end = n - remaining;
-        
+
         // Find the FIRST position of the max digit in this range
         let mut best_pos = 0;
         let mut best_digit = bank[start];
@@ -53,7 +60,7 @@ fn max_joltage_k(bank: &[u8], k: usize) -> u64 {
                 best_pos = i;
             }
         }
-        
+
         result = result * 10 + best_digit as u64;
         start = start + best_pos + 1;
     }
