@@ -15,7 +15,7 @@ fn max_joltage_2(bank: &[u8]) -> u64 {
     let mut max = 0u64;
     for i in 0..n - 1 {
         let tens = bank[i] as u64;
-        let units = suffix_max[i + 1] as u64;  // O(1) lookup instead of O(n) scan
+        let units = suffix_max[i + 1] as u64; // O(1) lookup instead of O(n) scan
         let joltage = tens * 10 + units;
         max = max.max(joltage);
     }
@@ -33,7 +33,10 @@ pub fn part_one(input: &str) -> Option<u64> {
         }
 
         // Convert line to digits
-        let digits: Vec<u8> = line.chars().map(|c| c.to_digit(10).unwrap() as u8).collect();
+        let digits: Vec<u8> = line
+            .chars()
+            .map(|c| c.to_digit(10).unwrap() as u8)
+            .collect();
         total += max_joltage_2(&digits);
     }
 
@@ -77,7 +80,10 @@ pub fn part_two(input: &str) -> Option<u64> {
             continue;
         }
 
-        let digits: Vec<u8> = line.chars().map(|c| c.to_digit(10).unwrap() as u8).collect();
+        let digits: Vec<u8> = line
+            .chars()
+            .map(|c| c.to_digit(10).unwrap() as u8)
+            .collect();
         total += max_joltage_k(&digits, 12);
     }
 

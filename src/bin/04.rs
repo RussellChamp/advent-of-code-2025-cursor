@@ -41,7 +41,10 @@ fn count_neighbors(grid: &[Vec<Cell>], row: usize, col: usize) -> usize {
             }
             let nr = row as i32 + dr;
             let nc = col as i32 + dc;
-            if nr >= 0 && nr < rows && nc >= 0 && nc < cols
+            if nr >= 0
+                && nr < rows
+                && nc >= 0
+                && nc < cols
                 && grid[nr as usize][nc as usize].is_paper()
             {
                 count += 1;

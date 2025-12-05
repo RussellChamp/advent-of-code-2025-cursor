@@ -19,7 +19,11 @@ fn generate_invalid_part1(min: u64, max: u64) -> Vec<u64> {
 
     // Pattern length k produces numbers with 2k digits
     for pattern_len in 1..=max_digits / 2 {
-        let pattern_min = if pattern_len == 1 { 1 } else { 10u64.pow(pattern_len as u32 - 1) };
+        let pattern_min = if pattern_len == 1 {
+            1
+        } else {
+            10u64.pow(pattern_len as u32 - 1)
+        };
         let pattern_max = 10u64.pow(pattern_len as u32) - 1;
 
         for pattern in pattern_min..=pattern_max {
@@ -40,7 +44,11 @@ fn generate_invalid_part2(min: u64, max: u64) -> Vec<u64> {
 
     // For each pattern length
     for pattern_len in 1..=max_digits / 2 {
-        let pattern_min = if pattern_len == 1 { 1 } else { 10u64.pow(pattern_len as u32 - 1) };
+        let pattern_min = if pattern_len == 1 {
+            1
+        } else {
+            10u64.pow(pattern_len as u32 - 1)
+        };
         let pattern_max = 10u64.pow(pattern_len as u32) - 1;
         let multiplier = 10u64.pow(pattern_len as u32);
 
