@@ -1,4 +1,5 @@
 use itertools::Itertools;
+use std::collections::HashSet;
 
 advent_of_code::solution!(2);
 
@@ -11,49 +12,84 @@ fn parse_range(s: &str) -> Option<(u64, u64)> {
         .and_then(|(a, b)| Some((a?, b?)))
 }
 
-/// Check if a number is "invalid" - made of a pattern repeated exactly twice
-fn is_invalid_part1(n: u64) -> bool {
-    let s = n.to_string();
-    let len = s.len();
-    // Must have even length for pattern to repeat exactly twice
-    len % 2 == 0 && s[..len / 2] == s[len / 2..]
+/// Generate all invalid numbers (pattern repeated exactly twice) within [min, max]
+fn generate_invalid_part1(min: u64, max: u64) -> Vec<u64> {
+    let mut result = Vec::new();
+    let max_digits = max.ilog10() as usize + 1;
+
+    // Pattern length k produces numbers with 2k digits
+    for pattern_len in 1..=max_digits / 2 {
+        let pattern_min = if pattern_len == 1 { 1 } else { 10u64.pow(pattern_len as u32 - 1) };
+        let pattern_max = 10u64.pow(pattern_len as u32) - 1;
+
+        for pattern in pattern_min..=pattern_max {
+            // Construct number by repeating pattern twice
+            let num = pattern * 10u64.pow(pattern_len as u32) + pattern;
+            if num >= min && num <= max {
+                result.push(num);
+            }
+        }
+    }
+    result
 }
 
-/// Check if a number is "invalid" - made of a pattern repeated at least twice
-fn is_invalid_part2(n: u64) -> bool {
-    let s = n.to_string();
-    let len = s.len();
+/// Generate all invalid numbers (pattern repeated at least twice) within [min, max]
+fn generate_invalid_part2(min: u64, max: u64) -> Vec<u64> {
+    let mut seen = HashSet::new();
+    let max_digits = max.ilog10() as usize + 1;
 
-    // Try each possible pattern length (1 to len/2)
-    (1..=len / 2).any(|pattern_len| {
-        // Pattern can only work if it divides evenly
-        len % pattern_len == 0 && {
-            let pattern = &s[..pattern_len];
-            // Check if all chunks match the pattern
-            s.as_bytes()
-                .chunks(pattern_len)
-                .all(|chunk| chunk == pattern.as_bytes())
+    // For each pattern length
+    for pattern_len in 1..=max_digits / 2 {
+        let pattern_min = if pattern_len == 1 { 1 } else { 10u64.pow(pattern_len as u32 - 1) };
+        let pattern_max = 10u64.pow(pattern_len as u32) - 1;
+        let multiplier = 10u64.pow(pattern_len as u32);
+
+        // For each number of repetitions (at least 2)
+        for reps in 2..=max_digits / pattern_len {
+            for pattern in pattern_min..=pattern_max {
+                // Build number by repeating pattern
+                let mut num = 0u64;
+                for _ in 0..reps {
+                    num = num * multiplier + pattern;
+                }
+
+                if num >= min && num <= max {
+                    seen.insert(num);
+                }
+            }
         }
-    })
+    }
+
+    seen.into_iter().collect()
 }
 
 pub fn part_one(input: &str) -> Option<u64> {
-    let sum = input
-        .split(',')
-        .filter_map(|part| parse_range(part))
-        .flat_map(|(start, end)| start..=end)
-        .filter(|&n| is_invalid_part1(n))
+    let ranges: Vec<(u64, u64)> = input.split(',').filter_map(parse_range).collect();
+
+    let global_min = ranges.iter().map(|r| r.0).min().unwrap_or(0);
+    let global_max = ranges.iter().map(|r| r.1).max().unwrap_or(0);
+
+    let invalid_nums = generate_invalid_part1(global_min, global_max);
+
+    let sum = invalid_nums
+        .iter()
+        .filter(|&&n| ranges.iter().any(|&(start, end)| n >= start && n <= end))
         .sum();
 
     Some(sum)
 }
 
 pub fn part_two(input: &str) -> Option<u64> {
-    let sum = input
-        .split(',')
-        .filter_map(|part| parse_range(part))
-        .flat_map(|(start, end)| start..=end)
-        .filter(|&n| is_invalid_part2(n))
+    let ranges: Vec<(u64, u64)> = input.split(',').filter_map(parse_range).collect();
+
+    let global_min = ranges.iter().map(|r| r.0).min().unwrap_or(0);
+    let global_max = ranges.iter().map(|r| r.1).max().unwrap_or(0);
+
+    let invalid_nums = generate_invalid_part2(global_min, global_max);
+
+    let sum = invalid_nums
+        .iter()
+        .filter(|&&n| ranges.iter().any(|&(start, end)| n >= start && n <= end))
         .sum();
 
     Some(sum)
