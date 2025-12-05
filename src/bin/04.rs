@@ -1,7 +1,35 @@
 advent_of_code::solution!(4);
 
+#[derive(Clone, Copy, PartialEq, Eq)]
+enum Cell {
+    Empty,
+    Paper,
+}
+
+impl Cell {
+    fn from_char(c: char) -> Self {
+        match c {
+            '@' => Cell::Paper,
+            _ => Cell::Empty,
+        }
+    }
+
+    fn is_paper(self) -> bool {
+        self == Cell::Paper
+    }
+}
+
+/// Parse input into a grid of cells
+fn parse_grid(input: &str) -> Vec<Vec<Cell>> {
+    input
+        .lines()
+        .filter(|line| !line.trim().is_empty())
+        .map(|line| line.chars().map(Cell::from_char).collect())
+        .collect()
+}
+
 /// Count adjacent paper rolls (8 directions) for a given position
-fn count_neighbors(grid: &[Vec<char>], row: usize, col: usize) -> usize {
+fn count_neighbors(grid: &[Vec<Cell>], row: usize, col: usize) -> usize {
     let rows = grid.len() as i32;
     let cols = grid[0].len() as i32;
     let mut count = 0;
@@ -14,7 +42,7 @@ fn count_neighbors(grid: &[Vec<char>], row: usize, col: usize) -> usize {
             let nr = row as i32 + dr;
             let nc = col as i32 + dc;
             if nr >= 0 && nr < rows && nc >= 0 && nc < cols {
-                if grid[nr as usize][nc as usize] == '@' {
+                if grid[nr as usize][nc as usize].is_paper() {
                     count += 1;
                 }
             }
@@ -24,23 +52,19 @@ fn count_neighbors(grid: &[Vec<char>], row: usize, col: usize) -> usize {
     count
 }
 
-pub fn part_one(input: &str) -> Option<u64> {
-    let grid: Vec<Vec<char>> = input
-        .lines()
-        .filter(|line| !line.trim().is_empty())
-        .map(|line| line.chars().collect())
-        .collect();
+/// Check if a paper roll at (row, col) is accessible (fewer than 4 neighbors)
+fn is_accessible(grid: &[Vec<Cell>], row: usize, col: usize) -> bool {
+    grid[row][col].is_paper() && count_neighbors(grid, row, col) < 4
+}
 
+pub fn part_one(input: &str) -> Option<u64> {
+    let grid = parse_grid(input);
     let mut accessible = 0u64;
 
-    for (row, line) in grid.iter().enumerate() {
-        for (col, &ch) in line.iter().enumerate() {
-            // Only check paper rolls
-            if ch == '@' {
-                // Accessible if fewer than 4 neighbors
-                if count_neighbors(&grid, row, col) < 4 {
-                    accessible += 1;
-                }
+    for row in 0..grid.len() {
+        for col in 0..grid[0].len() {
+            if is_accessible(&grid, row, col) {
+                accessible += 1;
             }
         }
     }
@@ -49,21 +73,16 @@ pub fn part_one(input: &str) -> Option<u64> {
 }
 
 pub fn part_two(input: &str) -> Option<u64> {
-    let mut grid: Vec<Vec<char>> = input
-        .lines()
-        .filter(|line| !line.trim().is_empty())
-        .map(|line| line.chars().collect())
-        .collect();
-
+    let mut grid = parse_grid(input);
     let mut total_removed = 0u64;
 
     loop {
         // Find all accessible rolls (fewer than 4 neighbors)
         let mut to_remove: Vec<(usize, usize)> = Vec::new();
 
-        for (row, line) in grid.iter().enumerate() {
-            for (col, &ch) in line.iter().enumerate() {
-                if ch == '@' && count_neighbors(&grid, row, col) < 4 {
+        for row in 0..grid.len() {
+            for col in 0..grid[0].len() {
+                if is_accessible(&grid, row, col) {
                     to_remove.push((row, col));
                 }
             }
@@ -76,7 +95,7 @@ pub fn part_two(input: &str) -> Option<u64> {
 
         // Remove all accessible rolls
         for (row, col) in &to_remove {
-            grid[*row][*col] = '.';
+            grid[*row][*col] = Cell::Empty;
         }
 
         total_removed += to_remove.len() as u64;
