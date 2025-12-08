@@ -1,0 +1,4 @@
+---
+alwaysApply: true
+---
+When generating code, consider utilizing libraries that have been added to the project (such as itertools) if they make the resulting code more performant or readable.
