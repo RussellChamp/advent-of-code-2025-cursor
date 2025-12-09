@@ -1,5 +1,3 @@
-use std::collections::{HashMap, HashSet};
-
 advent_of_code::solution!(7);
 
 /// Parse the grid and find the starting column
@@ -19,7 +17,7 @@ fn parse_grid(input: &str) -> (Vec<Vec<char>>, usize) {
 }
 
 /// Simulate tachyon beams through the manifold and count splits
-/// Beams merge when they occupy the same column (HashSet)
+/// Uses Vec<bool> instead of HashSet for beam positions
 fn count_splits(input: &str) -> u64 {
     let (grid, start_col) = parse_grid(input);
     if grid.is_empty() {
@@ -27,33 +25,41 @@ fn count_splits(input: &str) -> u64 {
     }
 
     let width = grid[0].len();
-    let mut beams: HashSet<usize> = HashSet::new();
-    beams.insert(start_col);
+    let mut beams = vec![false; width];
+    let mut new_beams = vec![false; width];
+    beams[start_col] = true;
 
     let mut split_count: u64 = 0;
 
     for row in grid.iter().skip(1) {
-        let mut new_beams: HashSet<usize> = HashSet::new();
+        new_beams.fill(false);
+        let mut has_beams = false;
 
-        for &col in &beams {
+        for col in 0..width {
+            if !beams[col] {
+                continue;
+            }
             match row[col] {
                 '^' => {
                     split_count += 1;
                     if col > 0 {
-                        new_beams.insert(col - 1);
+                        new_beams[col - 1] = true;
+                        has_beams = true;
                     }
                     if col + 1 < width {
-                        new_beams.insert(col + 1);
+                        new_beams[col + 1] = true;
+                        has_beams = true;
                     }
                 }
                 _ => {
-                    new_beams.insert(col);
+                    new_beams[col] = true;
+                    has_beams = true;
                 }
             }
         }
 
-        beams = new_beams;
-        if beams.is_empty() {
+        std::mem::swap(&mut beams, &mut new_beams);
+        if !has_beams {
             break;
         }
     }
@@ -62,7 +68,7 @@ fn count_splits(input: &str) -> u64 {
 }
 
 /// Count the number of unique timelines (paths) through the manifold
-/// Each particle at a position represents independent timelines - they don't merge
+/// Uses Vec<u64> instead of HashMap for particle counts
 fn count_timelines(input: &str) -> u64 {
     let (grid, start_col) = parse_grid(input);
     if grid.is_empty() {
@@ -70,40 +76,42 @@ fn count_timelines(input: &str) -> u64 {
     }
 
     let width = grid[0].len();
-
-    // Track number of particles (timelines) at each column position
-    let mut particles: HashMap<usize, u64> = HashMap::new();
-    particles.insert(start_col, 1);
+    let mut particles = vec![0u64; width];
+    let mut new_particles = vec![0u64; width];
+    particles[start_col] = 1;
 
     for row in grid.iter().skip(1) {
-        let mut new_particles: HashMap<usize, u64> = HashMap::new();
+        new_particles.fill(0);
 
-        for (&col, &count) in &particles {
+        for col in 0..width {
+            let count = particles[col];
+            if count == 0 {
+                continue;
+            }
             match row[col] {
                 '^' => {
                     // Each particle splits into 2 timelines (left and right)
                     if col > 0 {
-                        *new_particles.entry(col - 1).or_insert(0) += count;
+                        new_particles[col - 1] += count;
                     }
                     if col + 1 < width {
-                        *new_particles.entry(col + 1).or_insert(0) += count;
+                        new_particles[col + 1] += count;
                     }
                 }
                 _ => {
                     // Particle continues straight down
-                    *new_particles.entry(col).or_insert(0) += count;
+                    new_particles[col] += count;
                 }
             }
         }
 
-        particles = new_particles;
-        if particles.is_empty() {
+        std::mem::swap(&mut particles, &mut new_particles);
+        if particles.iter().all(|&c| c == 0) {
             break;
         }
     }
 
-    // Sum all particles - each represents a unique timeline
-    particles.values().sum()
+    particles.iter().sum()
 }
 
 pub fn part_one(input: &str) -> Option<u64> {

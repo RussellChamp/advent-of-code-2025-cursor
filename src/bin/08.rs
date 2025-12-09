@@ -1,4 +1,4 @@
-use rayon::slice::ParallelSliceMut;
+use rayon::prelude::*;
 
 advent_of_code::solution!(8);
 
@@ -82,42 +82,47 @@ fn distance_squared(a: (i64, i64, i64), b: (i64, i64, i64)) -> i64 {
     dx * dx + dy * dy + dz * dz
 }
 
-/// Parse input and generate sorted pairs (shared between parts)
-fn generate_sorted_pairs(input: &str) -> (Vec<(i64, i64, i64)>, Vec<(i64, usize, usize)>) {
-    let coords: Vec<(i64, i64, i64)> = input
+/// Parse coordinates from input
+fn parse_coords(input: &str) -> Vec<(i64, i64, i64)> {
+    input
         .lines()
         .filter(|line| !line.trim().is_empty())
         .filter_map(parse_coord)
-        .collect();
+        .collect()
+}
 
+/// Generate all pairs with distances in parallel
+fn generate_pairs_parallel(coords: &[(i64, i64, i64)]) -> Vec<(i64, usize, usize)> {
     let n = coords.len();
-
-    // Generate all pairs with distances
-    let mut pairs: Vec<(i64, usize, usize)> = Vec::with_capacity(n * (n - 1) / 2);
-    for i in 0..n {
-        for j in (i + 1)..n {
-            let dist = distance_squared(coords[i], coords[j]);
-            pairs.push((dist, i, j));
-        }
-    }
-
-    // Parallel sort by distance using rayon
-    pairs.par_sort_unstable_by_key(|&(dist, _, _)| dist);
-
-    (coords, pairs)
+    (0..n)
+        .into_par_iter()
+        .flat_map_iter(|i| {
+            let coords = coords;
+            ((i + 1)..n).map(move |j| {
+                let dist = distance_squared(coords[i], coords[j]);
+                (dist, i, j)
+            })
+        })
+        .collect()
 }
 
 pub fn part_one(input: &str) -> Option<u64> {
-    let (coords, pairs) = generate_sorted_pairs(input);
+    let coords = parse_coords(input);
     let n = coords.len();
     if n == 0 {
         return None;
     }
 
-    let mut uf = UnionFind::new(n);
+    let mut pairs = generate_pairs_parallel(&coords);
 
-    // Process first 1000 connections
-    for &(_, i, j) in pairs.iter().take(1000) {
+    // Use partial sort - we only need the 1000 smallest pairs
+    if pairs.len() > 1000 {
+        pairs.select_nth_unstable_by_key(999, |&(dist, _, _)| dist);
+        pairs.truncate(1000);
+    }
+
+    let mut uf = UnionFind::new(n);
+    for &(_, i, j) in &pairs {
         uf.union(i, j);
     }
 
@@ -129,11 +134,16 @@ pub fn part_one(input: &str) -> Option<u64> {
 }
 
 pub fn part_two(input: &str) -> Option<u64> {
-    let (coords, pairs) = generate_sorted_pairs(input);
+    let coords = parse_coords(input);
     let n = coords.len();
     if n <= 1 {
         return None;
     }
+
+    let mut pairs = generate_pairs_parallel(&coords);
+
+    // Full parallel sort needed for part 2 (process in order)
+    pairs.par_sort_unstable_by_key(|&(dist, _, _)| dist);
 
     let mut uf = UnionFind::new(n);
     let mut num_circuits = n;
@@ -160,10 +170,14 @@ mod tests {
     #[test]
     fn test_part_one() {
         // Example uses 10 connections, not 1000 - test the core logic
-        let (coords, pairs) = generate_sorted_pairs(&advent_of_code::template::read_file("examples", DAY));
+        let coords = parse_coords(&advent_of_code::template::read_file("examples", DAY));
         let n = coords.len();
+        let mut pairs = generate_pairs_parallel(&coords);
+        pairs.select_nth_unstable_by_key(9, |&(dist, _, _)| dist);
+        pairs.truncate(10);
+
         let mut uf = UnionFind::new(n);
-        for &(_, i, j) in pairs.iter().take(10) {
+        for &(_, i, j) in &pairs {
             uf.union(i, j);
         }
         let mut sizes = uf.get_circuit_sizes();

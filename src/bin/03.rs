@@ -1,12 +1,14 @@
+use smallvec::SmallVec;
+
 advent_of_code::solution!(3);
 
 /// Find the maximum 2-digit number by selecting exactly 2 batteries from a bank
-fn max_joltage_2(bank: &[u8]) -> u64 {
+fn max_joltage_2(bank: &SmallVec<[u8; 32]>) -> u64 {
     let n = bank.len();
 
     // Precompute suffix maximums: suffix_max[i] = max digit from position i to end
     // This avoids O(n) scan for each position, making overall O(n) instead of O(n²)
-    let mut suffix_max = vec![0u8; n];
+    let mut suffix_max: SmallVec<[u8; 32]> = SmallVec::from_elem(0, n);
     suffix_max[n - 1] = bank[n - 1];
     for i in (0..n - 1).rev() {
         suffix_max[i] = bank[i].max(suffix_max[i + 1]);
@@ -32,8 +34,8 @@ pub fn part_one(input: &str) -> Option<u64> {
             continue;
         }
 
-        // Convert line to digits
-        let digits: Vec<u8> = line
+        // Convert line to digits using SmallVec (avoids heap allocation for small inputs)
+        let digits: SmallVec<[u8; 32]> = line
             .chars()
             .map(|c| c.to_digit(10).unwrap() as u8)
             .collect();
@@ -44,7 +46,7 @@ pub fn part_one(input: &str) -> Option<u64> {
 }
 
 /// Find the maximum k-digit number by selecting exactly k batteries from a bank
-fn max_joltage_k(bank: &[u8], k: usize) -> u64 {
+fn max_joltage_k(bank: &SmallVec<[u8; 32]>, k: usize) -> u64 {
     let n = bank.len();
     let mut result = 0u64;
     let mut start = 0;
@@ -80,7 +82,7 @@ pub fn part_two(input: &str) -> Option<u64> {
             continue;
         }
 
-        let digits: Vec<u8> = line
+        let digits: SmallVec<[u8; 32]> = line
             .chars()
             .map(|c| c.to_digit(10).unwrap() as u8)
             .collect();

@@ -1,5 +1,4 @@
 use itertools::Itertools;
-use std::collections::HashSet;
 
 advent_of_code::solution!(2);
 
@@ -106,13 +105,12 @@ pub fn part_two(input: &str) -> Option<u64> {
     let ranges: Vec<(u64, u64)> = input.split(',').filter_map(parse_range).collect();
     let merged = merge_ranges(&ranges);
 
-    // Use a small HashSet only for deduplication within merged ranges
+    // Use itertools::unique() for deduplication
     // (needed because same number can match multiple pattern lengths)
-    let mut seen = HashSet::new();
     let sum: u64 = merged
         .iter()
         .flat_map(|&(start, end)| iter_invalid_part2(start, end))
-        .filter(|&n| seen.insert(n))
+        .unique()
         .sum();
 
     Some(sum)

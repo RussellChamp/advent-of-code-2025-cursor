@@ -1,72 +1,54 @@
+use std::collections::VecDeque;
+
 advent_of_code::solution!(4);
 
-#[derive(Clone, Copy, PartialEq, Eq)]
-enum Cell {
-    Empty,
-    Paper,
-}
-
-impl Cell {
-    fn from_char(c: char) -> Self {
-        match c {
-            '@' => Cell::Paper,
-            _ => Cell::Empty,
-        }
-    }
-
-    fn is_paper(self) -> bool {
-        self == Cell::Paper
-    }
-}
-
-/// Parse input into a grid of cells
-fn parse_grid(input: &str) -> Vec<Vec<Cell>> {
+/// Parse input into a grid of booleans (true = paper)
+fn parse_grid(input: &str) -> Vec<Vec<bool>> {
     input
         .lines()
         .filter(|line| !line.trim().is_empty())
-        .map(|line| line.chars().map(Cell::from_char).collect())
+        .map(|line| line.chars().map(|c| c == '@').collect())
         .collect()
 }
 
-/// Count adjacent paper rolls (8 directions) for a given position
-fn count_neighbors(grid: &[Vec<Cell>], row: usize, col: usize) -> usize {
-    let rows = grid.len() as i32;
-    let cols = grid[0].len() as i32;
-    let mut count = 0;
-
-    for dr in -1..=1 {
-        for dc in -1..=1 {
-            if dr == 0 && dc == 0 {
-                continue;
-            }
-            let nr = row as i32 + dr;
-            let nc = col as i32 + dc;
-            if nr >= 0
-                && nr < rows
-                && nc >= 0
-                && nc < cols
-                && grid[nr as usize][nc as usize].is_paper()
-            {
-                count += 1;
-            }
+/// Get valid neighbors for a position
+fn get_neighbors(row: usize, col: usize, rows: usize, cols: usize) -> impl Iterator<Item = (usize, usize)> {
+    const DELTAS: [(i32, i32); 8] = [
+        (-1, -1), (-1, 0), (-1, 1),
+        (0, -1),           (0, 1),
+        (1, -1),  (1, 0),  (1, 1),
+    ];
+    
+    DELTAS.into_iter().filter_map(move |(dr, dc)| {
+        let nr = row as i32 + dr;
+        let nc = col as i32 + dc;
+        if nr >= 0 && nr < rows as i32 && nc >= 0 && nc < cols as i32 {
+            Some((nr as usize, nc as usize))
+        } else {
+            None
         }
-    }
-
-    count
+    })
 }
 
-/// Check if a paper roll at (row, col) is accessible (fewer than 4 neighbors)
-fn is_accessible(grid: &[Vec<Cell>], row: usize, col: usize) -> bool {
-    grid[row][col].is_paper() && count_neighbors(grid, row, col) < 4
+/// Count adjacent paper rolls for a given position
+fn count_neighbors(grid: &[Vec<bool>], row: usize, col: usize) -> u8 {
+    let rows = grid.len();
+    let cols = grid[0].len();
+    get_neighbors(row, col, rows, cols)
+        .filter(|&(nr, nc)| grid[nr][nc])
+        .count() as u8
 }
 
 pub fn part_one(input: &str) -> Option<u64> {
     let grid = parse_grid(input);
-    let mut accessible = 0u64;
+    if grid.is_empty() {
+        return Some(0);
+    }
 
+    let mut accessible = 0u64;
     for row in 0..grid.len() {
         for col in 0..grid[0].len() {
-            if is_accessible(&grid, row, col) {
+            if grid[row][col] && count_neighbors(&grid, row, col) < 4 {
                 accessible += 1;
             }
         }
@@ -77,31 +59,61 @@ pub fn part_one(input: &str) -> Option<u64> {
 
 pub fn part_two(input: &str) -> Option<u64> {
     let mut grid = parse_grid(input);
+    if grid.is_empty() {
+        return Some(0);
+    }
+
+    let rows = grid.len();
+    let cols = grid[0].len();
+
+    // Pre-compute neighbor counts for all cells
+    let mut neighbor_counts: Vec<Vec<u8>> = vec![vec![0; cols]; rows];
+    for row in 0..rows {
+        for col in 0..cols {
+            if grid[row][col] {
+                neighbor_counts[row][col] = count_neighbors(&grid, row, col);
+            }
+        }
+    }
+
+    // Initialize queue with all accessible cells (paper with < 4 neighbors)
+    let mut queue: VecDeque<(usize, usize)> = VecDeque::new();
+    let mut in_queue: Vec<Vec<bool>> = vec![vec![false; cols]; rows];
+
+    for row in 0..rows {
+        for col in 0..cols {
+            if grid[row][col] && neighbor_counts[row][col] < 4 {
+                queue.push_back((row, col));
+                in_queue[row][col] = true;
+            }
+        }
+    }
+
     let mut total_removed = 0u64;
 
-    loop {
-        // Find all accessible rolls (fewer than 4 neighbors)
-        let mut to_remove: Vec<(usize, usize)> = Vec::new();
+    while let Some((row, col)) = queue.pop_front() {
+        in_queue[row][col] = false;
 
-        for row in 0..grid.len() {
-            for col in 0..grid[0].len() {
-                if is_accessible(&grid, row, col) {
-                    to_remove.push((row, col));
+        // Skip if already removed or no longer accessible
+        if !grid[row][col] || neighbor_counts[row][col] >= 4 {
+            continue;
+        }
+
+        // Remove this cell
+        grid[row][col] = false;
+        total_removed += 1;
+
+        // Update neighbor counts for adjacent cells and potentially add them to queue
+        for (nr, nc) in get_neighbors(row, col, rows, cols) {
+            if grid[nr][nc] {
+                neighbor_counts[nr][nc] = neighbor_counts[nr][nc].saturating_sub(1);
+                // If this cell became accessible and isn't already queued, add it
+                if neighbor_counts[nr][nc] < 4 && !in_queue[nr][nc] {
+                    queue.push_back((nr, nc));
+                    in_queue[nr][nc] = true;
                 }
             }
         }
-
-        // If no rolls are accessible, we're done
-        if to_remove.is_empty() {
-            break;
-        }
-
-        // Remove all accessible rolls
-        for (row, col) in &to_remove {
-            grid[*row][*col] = Cell::Empty;
-        }
-
-        total_removed += to_remove.len() as u64;
     }
 
     Some(total_removed)

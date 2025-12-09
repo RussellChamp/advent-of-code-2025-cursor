@@ -116,15 +116,20 @@ fn solve_worksheet_cephalopod(input: &str) -> u64 {
                 .unwrap_or('+');
 
             // Read columns right-to-left, each column forms a number
+            // Parse digits directly to u64 without String allocation
             let numbers: Vec<u64> = (start..end)
                 .rev()
                 .filter_map(|col| {
-                    let digits: String = number_rows
-                        .iter()
-                        .map(|row| row[col])
-                        .filter(|c| c.is_ascii_digit())
-                        .collect();
-                    digits.parse().ok()
+                    let mut num = 0u64;
+                    let mut has_digits = false;
+                    for row in number_rows {
+                        let c = row[col];
+                        if c.is_ascii_digit() {
+                            num = num * 10 + (c as u64 - '0' as u64);
+                            has_digits = true;
+                        }
+                    }
+                    has_digits.then_some(num)
                 })
                 .collect();
 

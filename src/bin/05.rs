@@ -1,56 +1,61 @@
 advent_of_code::solution!(5);
 
 /// A range of fresh ingredient IDs (inclusive)
+#[derive(Clone)]
 struct FreshRange {
     start: u64,
     end: u64,
 }
 
-impl FreshRange {
-    fn contains(&self, id: u64) -> bool {
-        id >= self.start && id <= self.end
-    }
-}
-
-/// Parse the input into fresh ranges and available IDs
+/// Parse the input into fresh ranges and available IDs without extra allocations
 fn parse_input(input: &str) -> (Vec<FreshRange>, Vec<u64>) {
-    // Normalize line endings and split on blank line
-    let normalized = input.replace("\r\n", "\n");
-    let mut sections = normalized.split("\n\n");
+    let mut ranges = Vec::new();
+    let mut ids = Vec::new();
+    let mut in_ids_section = false;
 
-    // Parse fresh ingredient ID ranges
-    let ranges_section = sections.next().unwrap_or("");
-    let ranges: Vec<FreshRange> = ranges_section
-        .lines()
-        .filter(|line| !line.trim().is_empty())
-        .map(|line| {
-            let mut parts = line.split('-');
-            let start: u64 = parts.next().unwrap().parse().unwrap();
-            let end: u64 = parts.next().unwrap().parse().unwrap();
-            FreshRange { start, end }
-        })
-        .collect();
+    for line in input.lines() {
+        let line = line.trim().trim_end_matches('\r');
+        if line.is_empty() {
+            in_ids_section = true;
+            continue;
+        }
 
-    // Parse available ingredient IDs
-    let ids_section = sections.next().unwrap_or("");
-    let ids: Vec<u64> = ids_section
-        .lines()
-        .filter(|line| !line.trim().is_empty())
-        .map(|line| line.trim().parse().unwrap())
-        .collect();
+        if in_ids_section {
+            if let Ok(id) = line.parse() {
+                ids.push(id);
+            }
+        } else if let Some((start_str, end_str)) = line.split_once('-') {
+            if let (Ok(start), Ok(end)) = (start_str.parse(), end_str.parse()) {
+                ranges.push(FreshRange { start, end });
+            }
+        }
+    }
 
     (ranges, ids)
 }
 
-/// Check if an ingredient ID is fresh (falls within any range)
-fn is_fresh(id: u64, ranges: &[FreshRange]) -> bool {
-    ranges.iter().any(|range| range.contains(id))
+/// Check if an ingredient ID is fresh using binary search on sorted ranges
+fn is_fresh_binary(id: u64, sorted_ranges: &[FreshRange]) -> bool {
+    // Binary search to find a range that might contain id
+    // Find the rightmost range where start <= id
+    let idx = sorted_ranges.partition_point(|r| r.start <= id);
+    if idx == 0 {
+        return false;
+    }
+    // Check if the range at idx-1 contains id
+    sorted_ranges[idx - 1].end >= id
 }
 
 pub fn part_one(input: &str) -> Option<u64> {
-    let (ranges, ids) = parse_input(input);
+    let (mut ranges, ids) = parse_input(input);
 
-    let fresh_count = ids.iter().filter(|&&id| is_fresh(id, &ranges)).count();
+    // Sort ranges by start for binary search
+    ranges.sort_unstable_by_key(|r| r.start);
+
+    let fresh_count = ids
+        .iter()
+        .filter(|&&id| is_fresh_binary(id, &ranges))
+        .count();
 
     Some(fresh_count as u64)
 }
@@ -62,7 +67,7 @@ fn count_unique_fresh_ids(mut ranges: Vec<FreshRange>) -> u64 {
     }
 
     // Sort ranges by start
-    ranges.sort_by_key(|r| r.start);
+    ranges.sort_unstable_by_key(|r| r.start);
 
     // Merge overlapping ranges
     let mut merged: Vec<FreshRange> = Vec::new();
