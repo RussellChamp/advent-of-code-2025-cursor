@@ -1,3 +1,5 @@
+use rayon::slice::ParallelSliceMut;
+
 advent_of_code::solution!(8);
 
 /// Union-Find data structure for tracking circuits
@@ -72,6 +74,7 @@ fn parse_coord(line: &str) -> Option<(i64, i64, i64)> {
 }
 
 /// Calculate squared Euclidean distance (to avoid sqrt)
+#[inline]
 fn distance_squared(a: (i64, i64, i64), b: (i64, i64, i64)) -> i64 {
     let dx = a.0 - b.0;
     let dy = a.1 - b.1;
@@ -79,7 +82,8 @@ fn distance_squared(a: (i64, i64, i64), b: (i64, i64, i64)) -> i64 {
     dx * dx + dy * dy + dz * dz
 }
 
-fn solve(input: &str, num_connections: usize) -> Option<u64> {
+/// Parse input and generate sorted pairs (shared between parts)
+fn generate_sorted_pairs(input: &str) -> (Vec<(i64, i64, i64)>, Vec<(i64, usize, usize)>) {
     let coords: Vec<(i64, i64, i64)> = input
         .lines()
         .filter(|line| !line.trim().is_empty())
@@ -87,9 +91,6 @@ fn solve(input: &str, num_connections: usize) -> Option<u64> {
         .collect();
 
     let n = coords.len();
-    if n == 0 {
-        return None;
-    }
 
     // Generate all pairs with distances
     let mut pairs: Vec<(i64, usize, usize)> = Vec::with_capacity(n * (n - 1) / 2);
@@ -100,37 +101,56 @@ fn solve(input: &str, num_connections: usize) -> Option<u64> {
         }
     }
 
-    // Sort by distance
-    pairs.sort_unstable_by_key(|&(dist, _, _)| dist);
+    // Parallel sort by distance using rayon
+    pairs.par_sort_unstable_by_key(|&(dist, _, _)| dist);
 
-    // Process connections using Union-Find
+    (coords, pairs)
+}
+
+pub fn part_one(input: &str) -> Option<u64> {
+    let (coords, pairs) = generate_sorted_pairs(input);
+    let n = coords.len();
+    if n == 0 {
+        return None;
+    }
+
     let mut uf = UnionFind::new(n);
-    let mut connections_made = 0;
 
-    for (_, i, j) in pairs {
-        if connections_made >= num_connections {
-            break;
-        }
-        // Try to connect - even if already connected, it counts as one of our connections
+    // Process first 1000 connections
+    for &(_, i, j) in pairs.iter().take(1000) {
         uf.union(i, j);
-        connections_made += 1;
     }
 
     // Get circuit sizes and find 3 largest
     let mut sizes = uf.get_circuit_sizes();
-    sizes.sort_unstable_by(|a, b| b.cmp(a)); // Sort descending
+    sizes.sort_unstable_by(|a, b| b.cmp(a));
 
-    // Multiply 3 largest
-    let result: u64 = sizes.iter().take(3).map(|&s| s as u64).product();
-    Some(result)
-}
-
-pub fn part_one(input: &str) -> Option<u64> {
-    solve(input, 1000)
+    Some(sizes.iter().take(3).map(|&s| s as u64).product())
 }
 
 pub fn part_two(input: &str) -> Option<u64> {
-    None
+    let (coords, pairs) = generate_sorted_pairs(input);
+    let n = coords.len();
+    if n <= 1 {
+        return None;
+    }
+
+    let mut uf = UnionFind::new(n);
+    let mut num_circuits = n;
+    let mut last_connection: Option<(usize, usize)> = None;
+
+    for &(_, i, j) in &pairs {
+        if uf.union(i, j) {
+            num_circuits -= 1;
+            last_connection = Some((i, j));
+
+            if num_circuits == 1 {
+                break;
+            }
+        }
+    }
+
+    last_connection.map(|(i, j)| coords[i].0 as u64 * coords[j].0 as u64)
 }
 
 #[cfg(test)]
@@ -139,14 +159,22 @@ mod tests {
 
     #[test]
     fn test_part_one() {
-        // Example uses 10 connections, not 1000
-        let result = solve(&advent_of_code::template::read_file("examples", DAY), 10);
-        assert_eq!(result, Some(40));
+        // Example uses 10 connections, not 1000 - test the core logic
+        let (coords, pairs) = generate_sorted_pairs(&advent_of_code::template::read_file("examples", DAY));
+        let n = coords.len();
+        let mut uf = UnionFind::new(n);
+        for &(_, i, j) in pairs.iter().take(10) {
+            uf.union(i, j);
+        }
+        let mut sizes = uf.get_circuit_sizes();
+        sizes.sort_unstable_by(|a, b| b.cmp(a));
+        let result: u64 = sizes.iter().take(3).map(|&s| s as u64).product();
+        assert_eq!(result, 40);
     }
 
     #[test]
     fn test_part_two() {
         let result = part_two(&advent_of_code::template::read_file("examples", DAY));
-        assert_eq!(result, None);
+        assert_eq!(result, Some(25272));
     }
 }
